@@ -1,49 +1,95 @@
-import numpy as np
+import pygame
+import random
 
-# Define grid world size
-GRID_SIZE = 5
-gamma = 0.9  # Discount factor
-threshold = 1e-4  # Convergence threshold
+# Grid config
+ROWS, COLS = 10, 10
+CELL_SIZE = 60
+WIDTH, HEIGHT = COLS * CELL_SIZE, ROWS * CELL_SIZE
 
-# Reward grid (negative for traps, high for exit)
-reward_grid = np.array([
-    [ -1, -1, -1, -1, 100],  
-    [ -1, -20, -1, -10, -1],  
-    [ -1, -1, -1, -1, -1],  
-    [ -1, -50, -1, -1, -1],  
-    [ -1, -1, -1, -1, -1]
-])
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREEN = (50, 205, 50)
+RED = (255, 0, 0)
+BLUE = (30, 144, 255)
+YELLOW = (255, 255, 0)
 
-# Initialize value function
-V = np.zeros((GRID_SIZE, GRID_SIZE))
+# Rewards
+GOAL_REWARD = 100
+PENALTY = -50
+STEP_COST = -1
 
-def value_iteration():
-    while True:
-        delta = 0
-        new_V = np.copy(V)
-        
-        for i in range(GRID_SIZE):
-            for j in range(GRID_SIZE):
-                if (i, j) == (0, 4):  # Exit cell, no update needed
-                    continue
+# MDP directions
+ACTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # right, down, left, up
 
-                # Possible moves: Up, Down, Left, Right
-                actions = []
-                if i > 0: actions.append(V[i-1, j])  # Up
-                if i < GRID_SIZE-1: actions.append(V[i+1, j])  # Down
-                if j > 0: actions.append(V[i, j-1])  # Left
-                if j < GRID_SIZE-1: actions.append(V[i, j+1])  # Right
-                
-                # Apply Bellman equation
-                best_action_value = max(actions) if actions else 0
-                new_V[i, j] = reward_grid[i, j] + gamma * best_action_value
-                
-                delta = max(delta, abs(V[i, j] - new_V[i, j]))
+pygame.init()
+win = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("MDP Maze Game")
 
-        V[:] = new_V
-        if delta < threshold:
-            break  # Stop if values converge
+font = pygame.font.SysFont("Arial", 24)
 
-value_iteration()
-print("Optimal Value Grid:")
-print(np.round(V, 1))
+
+class MazeGame:
+    def __init__(self):
+        self.agent_pos = [ROWS - 1, 0]
+        self.goal_pos = [0, COLS - 1]
+        self.penalties = set()
+        self.generate_penalties()
+
+    def generate_penalties(self):
+        while len(self.penalties) < 4:
+            p = (random.randint(0, ROWS - 1), random.randint(0, COLS - 1))
+            if p != tuple(self.agent_pos) and p != tuple(self.goal_pos):
+                self.penalties.add(p)
+
+    def draw_grid(self):
+        for i in range(ROWS):
+            for j in range(COLS):
+                rect = pygame.Rect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                if (i, j) == tuple(self.agent_pos):
+                    pygame.draw.rect(win, BLUE, rect)
+                elif (i, j) == tuple(self.goal_pos):
+                    pygame.draw.rect(win, GREEN, rect)
+                elif (i, j) in self.penalties:
+                    pygame.draw.rect(win, RED, rect)
+                else:
+                    pygame.draw.rect(win, WHITE, rect)
+                pygame.draw.rect(win, BLACK, rect, 1)
+
+    def get_reward(self, pos):
+        if tuple(pos) == tuple(self.goal_pos):
+            return GOAL_REWARD
+        elif tuple(pos) in self.penalties:
+            return PENALTY
+        return STEP_COST
+
+    def is_terminal(self, pos):
+        return tuple(pos) == tuple(self.goal_pos)
+
+    def move_agent(self, action):
+        new_x = self.agent_pos[0] + action[0]
+        new_y = self.agent_pos[1] + action[1]
+        if 0 <= new_x < ROWS and 0 <= new_y < COLS:
+            self.agent_pos = [new_x, new_y]
+
+    def get_best_action(self, pos):
+        best_score = -float("inf")
+        best_action = (0, 0)
+        for action in ACTIONS:
+            new_x, new_y = pos[0] + action[0], pos[1] + action[1]
+            if 0 <= new_x < ROWS and 0 <= new_y < COLS:
+                score = self.get_reward([new_x, new_y])
+                if score > best_score:
+                    best_score = score
+                    best_action = action
+        return best_action
+
+
+def main():
+    clock = pygame.time.Clock()
+    game = MazeGame()
+    running = True
+
+    while running:
+        win.fill(BLACK)
+        game.dra
